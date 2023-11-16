@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import config from "config";
 import cors from "cors";
 import fileUpload from "express-fileupload";
+import modeRoute from "./router/mode.routes";
+import { deleteMode, getMode } from "./service/mode.service";
 
 const app = express();
 app.use(express.json());
@@ -11,15 +13,18 @@ app.use(cors({ origin: "*" }));
 
 const server = require("http").createServer(app);
 
+export const io = require("socket.io")(server);
 
-const io = require("socket.io")(server);
-
-io.on("connection", (socket: any) => {
-  socket.on('test' , data => {
-    console.log("User send data" , data)
-    socket.emit("hello this is from server")
-  })
-})
+io.of("/change-mode").on("connection", (socket: any) => {
+  socket.on("checkMode", async (data) => {
+    let result = await getMode({ stationId: data });
+    if (result.length > 0) {
+      await deleteMode({ stationId: data });
+      console.log("User send data", data);
+      socket.emit(data, result[0]);
+    }
+  });
+});
 
 //require data
 
@@ -35,6 +40,8 @@ app.get("/", (req: Request, res: Response, next: NextFunction) => {
   res.send("ok");
 });
 
+app.use("/mode", modeRoute);
+
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   err.status = err.status || 409;
   res.status(err.status).json({
@@ -43,9 +50,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   });
 });
 
-
-
-let httpServer =server.listen(port, () =>
+let httpServer = server.listen(port, () =>
   console.log(`server is running in  http://${host}:${port}`)
 );
-
